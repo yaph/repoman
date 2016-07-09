@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import urllib.request
+import urllib.parse
+
+from datetime import datetime
+
+
+parser = argparse.ArgumentParser(description='Backup GitHub repos owned by given user.')
+parser.add_argument('user', type=str, help='GitHub user name')
+args = parser.parse_args()
+
+now = datetime.now()
+params = urllib.parse.urlencode({'per_page': 100})
+backup_dir = 'github-{}-{}{:02d}{:02d}'.format(args.user, now.year, now.month, now.day)
+os.makedirs(backup_dir, exist_ok=True)
+
+repos = []
+urls = ['https://api.github.com/users/{}/repos?{}'.format(args.user, params)]
+
+while urls:
+    with urllib.request.urlopen(urls.pop()) as resp:
+        link = resp.getheader('Link')
+        repos += [r for r in json.loads(resp.read().decode('utf-8')) if r['owner']['login'] == args.user]
+    if (link):
+        nav_url, rel = link.split(',')[0].split(';')
+        if rel and rel.strip() == 'rel="next"':
+            urls.append(nav_url.strip('<>'))
+
+# for repo in repos:
+#     archive = repo['name'] + '.tgz'
+#     subprocess.run(['git', 'clone', repo['clone_url']])
+#     subprocess.run(['tar', 'czfv', archive, repo['name']])
+#     shutil.move(archive, backup_dir)
+#     shutil.remtree(repo['name'])
